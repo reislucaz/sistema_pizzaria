@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UserCreateRequest;
 use App\Http\Requests\UserUpdateRequest;
-use App\Models\User;
+use App\Services\Contracts\UserServiceInterface;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+
 
 /**
  * Class UserController
@@ -19,137 +19,73 @@ use Illuminate\Support\Facades\Auth;
  */
 class UserController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    private UserServiceInterface $userService;
+
+    public function __construct(UserServiceInterface $userService)
+    {
+        $this->userService = $userService;
+    }
+
     public function index()
     {
-        $user = User::select('id', 'name', 'email', 'created_at')
-            ->paginate('10');
+        $users = $this->userService->getAllUsers(10);
 
-        return [
+        return response()->json([
             'status' => 200,
-            'menssagem' => 'Usuários encontrados!!',
-            'user' => $user
-        ];
+            'message' => 'Usuários encontrados!',
+            'data' => $users
+        ], 200);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function me()
+    public function show(int $id)
     {
-        $user = Auth::user();
+        $user = $this->userService->getUserById($id);
 
-        return [
+        if (!$user) {
+            return response()->json(['status' => 404, 'message' => 'Usuário não encontrado!'], 404);
+        }
+
+        return response()->json([
             'status' => 200,
-            'message' => 'Usuário logado!',
-            "usuario" => $user
-        ];
+            'message' => 'Usuário encontrado com sucesso!',
+            'data' => $user
+        ], 200);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(UserCreateRequest $request)
     {
-        $data = $request->all();
+        $user = $this->userService->createUser($request->validated());
 
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => bcrypt($data['password']),
-        ]);
-
-        return [
-            'status' => 200,
-            'menssagem' => 'Usuário cadastrado com sucesso!!',
-            'user' => $user
-        ];
+        return response()->json([
+            'status' => 201,
+            'message' => 'Usuário cadastrado com sucesso!',
+            'data' => $user
+        ], 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function update(UserUpdateRequest $request, int $id)
     {
-        $user = User::find($id);
+        $user = $this->userService->updateUser($id, $request->validated());
 
-        if(!$user){
-            return [
-                'status' => 404,
-                'message' => 'Usuário não encontrado! Que triste!',
-                'user' => $user
-            ];
+        if (!$user) {
+            return response()->json(['status' => 404, 'message' => 'Usuário não encontrado!'], 404);
         }
 
-        return [
+        return response()->json([
             'status' => 200,
-            'message' => 'Usuário encontrado com sucesso!!',
-            'user' => $user
-        ];
+            'message' => 'Usuário atualizado com sucesso!',
+            'data' => $user
+        ], 200);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function destroy(int $id)
     {
-        //
-    }
+        $deleted = $this->userService->deleteUser($id);
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UserUpdateRequest $request, string $id)
-    {
-        $data = $request->all();
-
-        $user = User::find($id);
-
-        if(!$user){
-            return [
-                'status' => 404,
-                'message' => 'Usuário não encontrado! Que triste!',
-                'user' => $user
-            ];
+        if (!$deleted) {
+            return response()->json(['status' => 404, 'message' => 'Usuário não encontrado!'], 404);
         }
 
-        // Verifica se a senha está presente nos dados da requisição
-        if (isset($data['password'])) {
-            $data['password'] = bcrypt($data['password']);  // Criptografa a senha antes de salvar
-        }
-
-        $user->update($data);
-
-        return [
-            'status' => 200,
-            'message' => 'Usuário atualizado com sucesso!!',
-            'user' => $user
-        ];
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        $user = User::find($id);
-
-        if(!$user){
-            return [
-                'status' => 404,
-                'message' => 'Usuário não encontrado! Que triste!',
-                'user' => $user
-            ];
-        }
-
-        $user->delete($id);
-
-        return [
-            'status' => 200,
-            'message' => 'Usuário deletado com sucesso!!'
-        ];
-
+        return response()->json(['status' => 200, 'message' => 'Usuário deletado com sucesso!'], 200);
     }
 }
